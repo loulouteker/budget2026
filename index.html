@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Budget 2026</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Budget">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FFFCF3">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: one-screen phone app — sticky month header, scrolling body, fixed tab bar with a central add button */
+:root{
+  /* Couleurs reprises à l'identique du classeur BUDGET_2026.xlsx */
+  --bg:#FFFCF3; --card:#FFFFFF; --fg:#000000; --muted:rgba(0,0,0,.58); --line:rgba(0,0,0,.09); --track:rgba(0,0,0,.07);
+  --accent:#8E7CC3; --on-accent:#FFFFFF;           /* RESTE À DÉPENSER */
+  --rev:#6AA84F; --rev-h:#D9EAD3; --rev-s:#E8F6E3;  /* REVENUS */
+  --dep:#E06666;                                    /* TOTAL DES DÉPENSES */
+  --var-h:#FFF2CC; --var-s:#FFF7DF;                 /* DÉPENSES VARIABLES */
+  --fix-h:#E6E0F4; --fix-s:#EEEAF9;                 /* DÉPENSES FIXES */
+  --ep:#6FA8DC; --ep-h:#E0F0FF; --ep-s:#F5FAFF;     /* ÉPARGNE */
+  --cr:#F6B26B; --cr-h:#FCE5CD; --cr-s:#FFF8F0;     /* CRÉDITS */
+  --sum-h:#F4CCCC; --sum-s:#FFECEC;                 /* RÉSUMÉ / SUIVI DES OPÉRATIONS */
+  --good:#6AA84F; --warn:#F6B26B; --bad:#E06666; --accent-soft:#EEEAF9;
+  --font:Calibri,Carlito,"Segoe UI",system-ui,-apple-system,sans-serif;
+  --display:var(--font); --body:var(--font); --mono:var(--font);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;-webkit-tap-highlight-color:transparent;padding-top:env(safe-area-inset-top,0px)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+.app{max-width:520px;margin:0 auto;padding:0 16px calc(120px + env(safe-area-inset-bottom,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+header.top h1{font-weight:700;font-size:30px;margin:0}
+.sub{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--good)}
+.dot.busy{background:var(--warn);animation:pulse 1s infinite}
+.dot.err{background:var(--bad)}
+@keyframes pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.dot.busy{animation:none}}
+.arrow{width:38px;height:38px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:20px;color:var(--accent)}
+.arrow:disabled{opacity:.3}
+.mnav{display:flex;gap:6px}
+.hero{background:var(--accent);color:var(--on-accent);border-radius:22px;padding:20px;display:grid;gap:6px;margin-top:4px}
+.hero .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.09em;opacity:.8}
+.hero .big{font-size:46px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.hero .hint{font-size:12.5px;opacity:.8}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.stat{background:var(--card);border-radius:16px;padding:12px 14px;display:grid;gap:2px;min-width:0}
+.stat .k{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.stat .v{font-size:21px;font-weight:700}
+.stat .p{font-size:12px;color:var(--muted)}
+h2{font-weight:700;font-size:21px;margin:26px 0 10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+h2 small{font-size:14px;color:var(--muted);font-weight:400}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:11px 14px;font-weight:700;font-size:17px}
+.sec-h small{font-size:14px;font-weight:400}
+.list.sec{margin-top:16px}
+.list.sec .row:first-of-type{border-top:0}
+.list{background:var(--card);border-radius:18px;overflow:hidden}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:12px 14px;border-top:1px solid var(--line);width:100%;text-align:left;align-items:center}
+.row:first-child{border-top:0}
+.row .name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .amt{font-size:15px;text-align:right;white-space:nowrap}
+.row .amt b{font-weight:500}.row .amt span{color:var(--muted)}
+.bar{grid-column:1/-1;height:6px;border-radius:3px;background:var(--track);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;background:var(--good)}
+.bar i.over{background:var(--bad)}.bar i.near{background:var(--warn)}.bar i.good{background:var(--good)}
+.pill{font-size:12px;padding:2px 8px;border-radius:99px;font-weight:700;background:var(--bad);color:#FFFFFF}
+.tx{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;padding:11px 14px;border-top:1px solid var(--line);width:100%;text-align:left}
+.tx:first-child{border-top:0}
+.ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:15px;color:#000000;background:var(--var-h)}
+.ico.rev{background:var(--rev-h)}.ico.fix{background:var(--fix-h)}.ico.var{background:var(--var-h)}.ico.ep{background:var(--ep-h)}.ico.cr{background:var(--cr-h)}
+.tx .t{min-width:0}.tx .t div{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx .t small{color:var(--muted);font-size:13.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx .a{font-weight:500}.tx .a.plus{color:var(--good)}
+.day{font-size:13px;font-weight:700;color:var(--fg);text-transform:uppercase;letter-spacing:.07em;margin:18px 4px 6px}
+.empty{background:var(--card);border-radius:18px;padding:28px 20px;text-align:center;color:var(--muted);line-height:1.5;margin-top:8px}
+.empty b{display:block;color:var(--fg);font-size:21px;margin-bottom:6px}
+.empty .primary{margin-top:16px}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(5,1fr);align-items:center}
+nav.tabs button{display:grid;justify-items:center;gap:3px;font-size:11.5px;color:var(--muted);padding:6px 0;font-weight:500}
+nav.tabs button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button[aria-selected="true"]{color:var(--accent)}
+nav.tabs .add{width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-size:30px;line-height:1;justify-self:center;margin-top:-22px;box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 40%,transparent);display:grid;place-items:center;padding:0}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:520px;border-radius:24px 24px 0 0;padding:10px 16px calc(20px + env(safe-area-inset-bottom,0px));max-height:92%;overflow:auto;animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:.6}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 10px}
+.sheet h3{font-size:23px;margin:4px 0 14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet h3 button{font-size:16px;color:var(--accent);font-weight:700}
+.seg{display:grid;grid-template-columns:repeat(2,1fr);background:var(--track);border-radius:12px;padding:3px;gap:3px;margin-bottom:14px}
+.seg button{padding:8px;border-radius:9px;font-weight:700;font-size:14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.amount-in{width:100%;font-family:var(--font);font-size:46px;font-weight:700;text-align:center;border:0;background:transparent;color:var(--fg);padding:6px 0}
+.field{background:var(--card);border-radius:14px;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;padding:4px 14px;margin-top:10px}
+.field label{color:var(--muted);font-size:14px}
+.field input{border:0;background:transparent;color:var(--fg);font:inherit;padding:10px 0;text-align:right;width:100%;min-width:0}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+.chip{padding:8px 12px;border-radius:99px;background:var(--card);font-size:14px;border:1.5px solid transparent}
+.chip[aria-pressed="true"]{border-color:var(--accent);color:#000000;background:var(--fix-s);font-weight:700}
+.grp{font-size:13px;font-weight:700;color:var(--fg);text-transform:uppercase;letter-spacing:.07em;margin:14px 2px 2px}
+.primary{display:block;width:100%;margin-top:18px;background:var(--accent);color:var(--on-accent);border-radius:14px;padding:15px;font-weight:600;font-size:16px;text-align:center}
+.primary:disabled{opacity:.4}
+.secondary{display:block;width:100%;margin-top:10px;background:var(--card);border-radius:14px;padding:14px;font-weight:500;text-align:center}
+.danger{width:100%;margin-top:10px;color:var(--bad);padding:12px;font-weight:500}
+.chart{background:var(--card);border-radius:18px;padding:14px 10px 8px}
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);padding:6px 6px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#000000;color:#FFFFFF;padding:10px 16px;border-radius:16px;font-size:14px;z-index:30;font-weight:500;max-width:calc(100% - 32px);text-align:center}
+.note{font-size:12.5px;color:var(--muted);margin:8px 4px;line-height:1.45}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:12px 14px;border-top:1px solid var(--line)}
+.kv:first-child{border-top:0}.kv span{color:var(--muted)}.kv b{font-weight:500;text-align:right;overflow-wrap:anywhere}
+.field-in{width:100%;border:0;background:var(--card);border-radius:12px;padding:12px 14px;font:inherit;color:var(--fg);margin-top:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div style="min-width:0"><div class="sub" id="sub"><i class="dot" id="dot"></i><span id="status">Budget</span></div><h1 id="title">Budget</h1></div>
+    <div class="mnav" id="mnav" hidden><button class="arrow" id="prev" aria-label="Mois précédent">‹</button><button class="arrow" id="next" aria-label="Mois suivant">›</button></div>
+  </header>
+  <main id="view"><div class="empty"><b>Ouverture…</b></div></main>
+</div>
+
+<nav class="tabs" role="tablist" id="tabs" hidden>
+  <button role="tab" data-tab="mois" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Mois</button>
+  <button role="tab" data-tab="ops" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>Opérations</button>
+  <button class="add" id="addBtn" aria-label="Ajouter une opération">+</button>
+  <button role="tab" data-tab="annee" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Année</button>
+  <button role="tab" data-tab="reglages" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Réglages</button>
+</nav>
+<div id="layer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="config.js"></script>
+<script>
+/*PURE-START*/
+// ---------- Lecture / écriture du fichier Excel (xlsx = zip de fichiers XML) ----------
+const MONTH_SHEETS=["JANVIER","FÉVRIER","MARS","AVRIL","MAI","JUIN","JUILLET","AOÛT","SEPTEMBRE","OCTOBRE","NOVEMBRE","DÉCEMBRE"];
+const PARAM="PARAMÈTRES";
+// Où se trouvent les catégories (onglet PARAMÈTRES) et leur budget (onglets des mois)
+const SLOTS={rev:{col:"D",cap:8,mcol:"D",mrow:21},fix:{col:"E",cap:32,mcol:"H",mrow:21},var:{col:"F",cap:32,mcol:"M",mrow:21},ep:{col:"G",cap:8,mcol:"D",mrow:33},cr:{col:"H",cap:8,mcol:"D",mrow:45}};
+const TX_FIRST=57,TX_LAST=306;
+const XLSX_MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+const unesc=s=>String(s).replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#(\d+);/g,(_,n)=>String.fromCharCode(+n)).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCharCode(parseInt(n,16))).replace(/&amp;/g,"&");
+const xesc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const getAttr=(tag,name)=>{const m=tag.match(new RegExp("\\s"+name.replace(":","\\:")+'="([^"]*)"'));return m?m[1]:null};
+const pad=n=>String(n).padStart(2,"0");
+const EPOCH=Date.UTC(1899,11,30);
+const isoToSerial=iso=>{const [y,m,d]=iso.split("-").map(Number);return Math.round((Date.UTC(y,m-1,d)-EPOCH)/864e5)};
+const serialToISO=n=>{const d=new Date(EPOCH+Math.round(n)*864e5);return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`};
+const colNum=c=>{let n=0;for(const ch of c)n=n*26+ch.charCodeAt(0)-64;return n};
+
+function parseShared(xml){
+  const out=[];const re=/<si>([\s\S]*?)<\/si>/g;let m;
+  while((m=re.exec(xml))){const body=m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g,"");out.push(unesc([...body.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join("")))}
+  return out;
+}
+function parseCells(xml,ss){
+  const out={};const re=/<c r="([A-Z]+\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;let m;
+  while((m=re.exec(xml))){
+    const a=m[2],inner=m[3]||"";const t=(a.match(/\st="([^"]*)"/)||[])[1];
+    const vm=inner.match(/<v>([\s\S]*?)<\/v>/);const fm=inner.match(/<f(?:\s[^>]*)?>([\s\S]*?)<\/f>/);
+    let v=null;
+    if(t==="s"){if(vm)v=ss[+vm[1]]??""}
+    else if(t==="inlineStr")v=unesc([...inner.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join(""));
+    else if(t==="str"||t==="e")v=vm?unesc(vm[1]):"";
+    else if(t==="b")v=vm?vm[1]==="1":null;
+    else if(vm)v=parseFloat(vm[1]);
+    out[m[1]]={v,f:fm?unesc(fm[1]):null,shared:/<f[^>]*t="shared"/.test(inner)};
+  }
+  return out;
+}
+function cellXml(addr,s,value){
+  const sa=s?` s="${s}"`:"";
+  if(value===null||value===undefined||value==="")return `<c r="${addr}"${sa}/>`;
+  if(typeof value==="number")return `<c r="${addr}"${sa}><v>${value}</v></c>`;
+  return `<c r="${addr}"${sa} t="inlineStr"><is><t xml:space="preserve">${xesc(value)}</t></is></c>`;
+}
+// Remplace une seule cellule dans le XML d'un onglet, en gardant son style ; tout le reste du fichier est intact.
+function setCell(xml,addr,value){
+  const re=new RegExp(`<c r="${addr}"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)`);
+  const m=xml.match(re);
+  if(m){
+    if(/<f[^>]*t="shared"/.test(m[2]||""))throw new Error(`La cellule ${addr} contient une formule partagée : modification refusée pour protéger le fichier.`);
+    const s=(m[1].match(/\ss="(\d+)"/)||[])[1];
+    return xml.slice(0,m.index)+cellXml(addr,s,value)+xml.slice(m.index+m[0].length);
+  }
+  const [,col,row]=addr.match(/^([A-Z]+)(\d+)$/);
+  const nc=cellXml(addr,null,value);
+  const rre=new RegExp(`<row r="${row}"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/row>)`);
+  const rm=xml.match(rre);
+  if(rm){
+    let inner=rm[2]||"";let pos=inner.length;
+    for(const c of inner.matchAll(/<c r="([A-Z]+)\d+"/g)){if(colNum(c[1])>colNum(col)){pos=c.index;break}}
+    inner=inner.slice(0,pos)+nc+inner.slice(pos);
+    const attrs=rm[1].replace(/\sspans="[^"]*"/,"");
+    return xml.slice(0,rm.index)+`<row r="${row}"${attrs}>${inner}</row>`+xml.slice(rm.index+rm[0].length);
+  }
+  const newRow=`<row r="${row}">${nc}</row>`;
+  if(/<sheetData\s*\/>/.test(xml))return xml.replace(/<sheetData\s*\/>/,`<sheetData>${newRow}</sheetData>`);
+  for(const r of xml.matchAll(/<row r="(\d+)"/g)){if(+r[1]>+row)return xml.slice(0,r.index)+newRow+xml.slice(r.index)}
+  return xml.replace("</sheetData>",newRow+"</sheetData>");
+}
+async function openWorkbook(buf){
+  const zip=await JSZip.loadAsync(buf);
+  const need=p=>{const f=zip.file(p);if(!f)throw new Error("Ce fichier n'est pas un classeur Excel valide.");return f.async("string")};
+  const wbXml=await need("xl/workbook.xml"),rels=await need("xl/_rels/workbook.xml.rels");
+  const relMap={};for(const m of rels.matchAll(/<Relationship\b[^>]*>/g))relMap[getAttr(m[0],"Id")]=getAttr(m[0],"Target");
+  const sheets={};for(const m of wbXml.matchAll(/<sheet\b[^>]*>/g)){let t=relMap[getAttr(m[0],"r:id")];if(!t)continue;t=t.startsWith("/")?t.slice(1):"xl/"+t.replace(/^\.\//,"");sheets[unesc(getAttr(m[0],"name"))]=t}
+  const ssf=zip.file("xl/sharedStrings.xml");const ss=ssf?parseShared(await ssf.async("string")):[];
+  const wb={zip,sheets,ss,xml:{},cells:{},dirty:new Set()};
+  for(const n of [PARAM,...MONTH_SHEETS]){
+    if(!sheets[n]||!zip.file(sheets[n]))throw new Error(`Onglet « ${n} » introuvable : ce n'est pas le bon fichier, ou un onglet a été renommé.`);
+    wb.xml[n]=await zip.file(sheets[n]).async("string");wb.cells[n]=parseCells(wb.xml[n],ss);
+  }
+  return wb;
+}
+// Valeur d'une cellule ; suit les formules simples du type =SEPTEMBRE!H21 pour rester juste après une modification.
+function cellVal(wb,sheet,addr,depth=0){
+  const c=wb.cells[sheet]?.[addr];if(!c)return null;
+  if(c.f&&depth<15){const m=c.f.match(/^'?([^'!]+)'?!\$?([A-Z]+)\$?(\d+)$/);if(m&&wb.cells[m[1]])return cellVal(wb,m[1],m[2]+m[3],depth+1)}
+  return c.v;
+}
+const blank=v=>v===null||v===undefined||String(v).trim()==="";
+function buildModel(wb){
+  const P=wb.cells[PARAM];
+  const currency=blank(P.B5?.v)?"€":String(P.B5.v).trim();
+  const year=+P.B12?.v||new Date().getFullYear();
+  const cats={},slot={};
+  for(const [g,s] of Object.entries(SLOTS)){cats[g]=[];for(let i=0;i<s.cap;i++){const v=P[s.col+(5+i)]?.v;if(!blank(v)){const name=String(v).trim();if(slot[name])continue;cats[g].push(name);slot[name]={g,addr:s.mcol+(s.mrow+i)}}}}
+  const months=MONTH_SHEETS.map((sh,i)=>{
+    const C=wb.cells[sh],b={};
+    for(const [c,sl] of Object.entries(slot))b[c]=+cellVal(wb,sh,sl.addr)||0;
+    const tx=[];
+    for(let r=TX_FIRST;r<=TX_LAST;r++){
+      const a=C["D"+r]?.v,c=C["E"+r]?.v;if(blank(a)&&blank(c))continue;
+      const dv=C["B"+r]?.v,hasDate=typeof dv==="number";
+      tx.push({id:sh+"!"+r,sheet:sh,row:r,d:hasDate?serialToISO(dv):`${year}-${pad(i+1)}-01`,hasDate,a:+a||0,c:blank(c)?"":String(c).trim(),n:blank(C["H"+r]?.v)?"":String(C["H"+r].v)});
+    }
+    return {sheet:sh,solde:+cellVal(wb,sh,"D7")||0,b,tx};
+  });
+  return {currency,year,cats,slot,months};
+}
+function markDirty(wb,sheet,xml){wb.xml[sheet]=xml;wb.cells[sheet]=parseCells(xml,wb.ss);wb.dirty.add(sheet)}
+function writeRow(wb,sheet,row,t){
+  let x=wb.xml[sheet];
+  x=setCell(x,"B"+row,t?isoToSerial(t.d):null);
+  x=setCell(x,"D"+row,t?t.a:null);
+  x=setCell(x,"E"+row,t?t.c:null);
+  x=setCell(x,"H"+row,t&&t.n?t.n:null);
+  markDirty(wb,sheet,x);
+}
+function freeRow(wb,sheet){const C=wb.cells[sheet];for(let r=TX_FIRST;r<=TX_LAST;r++){if(blank(C["D"+r]?.v)&&blank(C["E"+r]?.v))return r}return null}
+function sheetForDate(model,iso){const [y,m]=iso.split("-").map(Number);if(y!==model.year)throw new Error(`Ce fichier couvre l'année ${model.year} : choisissez une date de ${model.year}.`);return MONTH_SHEETS[m-1]}
+function opAdd(wb,model,t){const sh=sheetForDate(model,t.d);const r=freeRow(wb,sh);if(!r)throw new Error(`L'onglet ${sh} est plein (250 opérations).`);writeRow(wb,sh,r,t)}
+function checkSame(wb,old){const C=wb.cells[old.sheet];const a=+C["D"+old.row]?.v||0,c=blank(C["E"+old.row]?.v)?"":String(C["E"+old.row].v).trim();
+  if(Math.abs(a-old.a)>0.004||c!==old.c)throw Object.assign(new Error("Cette opération a été modifiée dans l'Excel entre-temps. Les données sont rechargées : réessayez."),{stale:true})}
+function opEdit(wb,model,old,t){checkSame(wb,old);const sh=sheetForDate(model,t.d);if(sh===old.sheet)writeRow(wb,sh,old.row,t);else{writeRow(wb,old.sheet,old.row,null);opAdd(wb,model,t)}}
+function opDelete(wb,model,old){checkSame(wb,old);writeRow(wb,old.sheet,old.row,null)}
+function opBudget(wb,model,m,cat,value){const sh=MONTH_SHEETS[m-1];const addr=cat===null?"D7":model.slot[cat]?.addr;if(!addr)throw new Error("Catégorie introuvable dans PARAMÈTRES.");markDirty(wb,sh,setCell(wb.xml[sh],addr,value))}
+async function packWorkbook(wb){
+  const z=wb.zip;
+  for(const n of wb.dirty)z.file(wb.sheets[n],wb.xml[n]);
+  // Excel recalculera toutes les formules à l'ouverture
+  if(z.file("xl/calcChain.xml")){
+    z.remove("xl/calcChain.xml");
+    let ct=await z.file("[Content_Types].xml").async("string");ct=ct.replace(/<Override[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/g,"");z.file("[Content_Types].xml",ct);
+    let rels=await z.file("xl/_rels/workbook.xml.rels").async("string");rels=rels.replace(/<Relationship[^>]*Target="[^"]*calcChain\.xml"[^>]*\/>/g,"");z.file("xl/_rels/workbook.xml.rels",rels);
+  }
+  let w=await z.file("xl/workbook.xml").async("string");
+  if(!/fullCalcOnLoad=/.test(w)){
+    if(/<calcPr\b/.test(w))w=w.replace(/<calcPr\b/,'<calcPr fullCalcOnLoad="1"');
+    else w=w.replace(/(<extLst\b|<\/workbook>)/,'<calcPr fullCalcOnLoad="1"/>$1');
+  }
+  z.file("xl/workbook.xml",w);
+  return z.generateAsync({type:"arraybuffer",compression:"DEFLATE",compressionOptions:{level:6},mimeType:XLSX_MIME});
+}
+/*PURE-END*/
+
+// ---------- Connexion Microsoft (OAuth 2.0 + PKCE, sans serveur) ----------
+const LSK="budget26.";
+const LS={get(k){try{return JSON.parse(localStorage.getItem(LSK+k))}catch(e){return null}},set(k,v){try{localStorage.setItem(LSK+k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(LSK+k)}catch(e){}}};
+const CLIENT_ID=((window.BUDGET_CONFIG||{}).clientId||"").trim()||LS.get("clientId")||"";
+const AUTH="https://login.microsoftonline.com/consumers/oauth2/v2.0";
+const SCOPES="offline_access Files.ReadWrite";
+const GRAPH="https://graph.microsoft.com/v1.0";
+const REDIRECT=location.origin+location.pathname;
+const NEED_LOGIN={needLogin:true};
+const b64url=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const rand=n=>{const a=new Uint8Array(n);crypto.getRandomValues(a);return b64url(a)};
+
+async function login(){
+  const verifier=rand(48),state=rand(16);
+  const challenge=b64url(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier)));
+  LS.set("pkce",{verifier,state});
+  const p=new URLSearchParams({client_id:CLIENT_ID,response_type:"code",redirect_uri:REDIRECT,scope:SCOPES,code_challenge:challenge,code_challenge_method:"S256",state,response_mode:"query"});
+  location.assign(AUTH+"/authorize?"+p);
+}
+async function tokenRequest(params){
+  let r;
+  try{r=await fetch(AUTH+"/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:CLIENT_ID,scope:SCOPES,...params})})}
+  catch(e){throw new Error("Pas de connexion Internet.")}
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw Object.assign(new Error(explainAuth(j.error_description||j.error||"Connexion refusée")),{auth:true});
+  const tok={access:j.access_token,refresh:j.refresh_token,exp:Date.now()+((j.expires_in||3600)-120)*1000};
+  LS.set("tok",tok);return tok;
+}
+function explainAuth(msg){
+  if(/AADSTS50011/.test(msg))return "L'adresse de l'app n'est pas déclarée dans Azure (URI de redirection). Ajoutez exactement : "+REDIRECT;
+  if(/AADSTS9002326|AADSTS9002327/.test(msg))return "Dans Azure, l'adresse de redirection doit être de type « Application monopage (SPA) ».";
+  if(/AADSTS700016/.test(msg))return "Identifiant d'application inconnu : vérifiez la valeur collée dans config.js.";
+  if(/AADSTS50020|AADSTS90072|unauthorized_client/.test(msg))return "Dans Azure, le type de compte doit inclure les « comptes Microsoft personnels ».";
+  return msg.split(/\r?\n/)[0];
+}
+async function handleRedirect(){
+  const q=new URLSearchParams(location.search);
+  if(!q.has("code")&&!q.has("error"))return;
+  history.replaceState(null,"",REDIRECT);
+  if(q.has("error"))throw new Error(explainAuth(q.get("error_description")||q.get("error")));
+  const pk=LS.get("pkce");LS.del("pkce");
+  if(!pk||pk.state!==q.get("state"))throw new Error("La connexion a été interrompue. Recommencez.");
+  await tokenRequest({grant_type:"authorization_code",code:q.get("code"),redirect_uri:REDIRECT,code_verifier:pk.verifier});
+}
+async function accessToken(){
+  let t=LS.get("tok");if(!t)throw NEED_LOGIN;
+  if(Date.now()<t.exp)return t.access;
+  try{t=await tokenRequest({grant_type:"refresh_token",refresh_token:t.refresh});return t.access}
+  catch(e){if(e.auth){LS.del("tok");throw NEED_LOGIN}throw e}
+}
+async function graph(path,opts={}){
+  const tok=await accessToken();let r;
+  try{r=await fetch(path.startsWith("http")?path:GRAPH+path,{...opts,headers:{Authorization:"Bearer "+tok,...(opts.headers||{})}})}
+  catch(e){throw new Error("Pas de connexion Internet.")}
+  if(r.status===401){LS.del("tok");throw NEED_LOGIN}
+  return r;
+}
+
+// ---------- OneDrive ----------
+async function fetchWorkbook(){
+  const id=S.file?.id;
+  const r=await graph(`/me/drive/items/${id}`);
+  if(r.status===404)throw new Error("Fichier introuvable sur OneDrive. Choisissez-le à nouveau dans Réglages.");
+  if(!r.ok)throw new Error(`OneDrive ne répond pas (erreur ${r.status}).`);
+  const item=await r.json();let buf=null;
+  const dl=item["@microsoft.graph.downloadUrl"];
+  if(dl){try{const d=await fetch(dl,{cache:"no-store"});if(d.ok)buf=await d.arrayBuffer()}catch(e){}}
+  if(!buf){const d=await graph(`/me/drive/items/${id}/content`);if(!d.ok)throw new Error(`Téléchargement impossible (erreur ${d.status}).`);buf=await d.arrayBuffer()}
+  const wb=await openWorkbook(buf);
+  return {wb,item};
+}
+async function refresh(quiet){
+  if(S.busy)return;
+  setStatus("busy","Synchronisation…");
+  try{const {wb,item}=await fetchWorkbook();setModel(buildModel(wb),item);if(!quiet)toast("Données à jour")}
+  catch(e){onError(e)}
+}
+async function mutate(label,apply){
+  if(S.busy)return false;S.busy=true;setStatus("busy","Enregistrement…");
+  try{
+    for(let attempt=0;attempt<3;attempt++){
+      const {wb,item}=await fetchWorkbook();
+      const model=buildModel(wb);
+      try{apply(wb,model)}catch(e){if(e.stale)setModel(model,item);throw e}
+      const buf=await packWorkbook(wb);
+      const r=await graph(`/me/drive/items/${S.file.id}/content`,{method:"PUT",headers:{"If-Match":item.eTag,"Content-Type":XLSX_MIME},body:buf});
+      if(r.status===412||r.status===409)continue;
+      if(r.status===423)throw new Error("Le fichier est verrouillé par Excel. Fermez-le sur l'ordinateur ou réessayez dans une minute.");
+      if(r.status===507)throw new Error("Votre OneDrive est plein.");
+      if(!r.ok)throw new Error(`OneDrive a refusé l'enregistrement (erreur ${r.status}).`);
+      const saved=await r.json().catch(()=>item);
+      setModel(buildModel(wb),saved);S.busy=false;toast(label);return true;
+    }
+    throw new Error("Le fichier change en ce moment sur un autre appareil. Réessayez.");
+  }catch(e){S.busy=false;onError(e);return false}
+}
+async function listFiles(){
+  const r=await graph(`/me/drive/root/search(q='BUDGET')?$select=id,name,parentReference,lastModifiedDateTime,file&$top=50`);
+  if(!r.ok)throw new Error(`Recherche impossible (erreur ${r.status}).`);
+  const j=await r.json();return (j.value||[]).filter(f=>/\.xlsx$/i.test(f.name));
+}
+
+// ---------- État et affichage ----------
+const MOIS=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+const GROUPS=[["rev","Revenus"],["var","Dépenses variables"],["fix","Dépenses fixes"],["ep","Épargne"],["cr","Crédits"]];
+const ORDER=[["var","Dépenses variables"],["fix","Dépenses fixes"],["ep","Épargne"],["cr","Crédits"]];
+const now=new Date();
+const S={model:LS.get("model"),file:LS.get("file"),synced:LS.get("synced"),tab:"mois",m:now.getMonth()+1,busy:false,screen:null};
+try{const t=sessionStorage.getItem("budget26.tab");if(t)S.tab=t}catch(e){}
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cur=()=>S.model?.currency||"€";
+const fmt=(v,dec=true)=>{const n=Math.abs(v)<0.005?0:v;return n.toLocaleString("fr-FR",{minimumFractionDigits:dec?2:0,maximumFractionDigits:dec?2:0})+" "+cur()};
+const groupOf=c=>{for(const [g] of GROUPS)if((S.model?.cats?.[g]||[]).includes(c))return g;return "var"};
+
+function setModel(model,item){
+  S.model=model;S.synced=Date.now();LS.set("model",model);LS.set("synced",S.synced);
+  if(item?.name&&S.file){S.file.name=item.name;LS.set("file",S.file)}
+  if(S.m<1||S.m>12)S.m=1;if(model.year!==now.getFullYear()&&!S.mset){S.m=1}S.mset=true;
+  S.screen="app";setStatus("ok");render();
+}
+function setStatus(kind,text){
+  $("#dot").className="dot"+(kind==="busy"?" busy":kind==="err"?" err":"");
+  if(!text){const t=S.synced?new Date(S.synced):null;text=t?("À jour · "+t.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})):"Budget"}
+  $("#status").textContent=text;
+}
+function onError(e){
+  S.busy=false;
+  if(e===NEED_LOGIN||e?.needLogin){S.screen="login";render();return}
+  setStatus("err","Non synchronisé");
+  toast(e?.message||"Une erreur est survenue.",4500);
+}
+
+function monthCalc(m){
+  const M=S.model,mo=M.months[m-1],act={};
+  for(const t of mo.tx)act[t.c]=(act[t.c]||0)+t.a;
+  const sum=(g,src)=>(M.cats[g]||[]).reduce((s,c)=>s+(+src[c]||0),0);
+  const out={act,mo};
+  for(const [g] of GROUPS)out[g]={p:sum(g,mo.b),a:sum(g,act)};
+  let engaged=0;for(const g of ["fix","var","cr","ep"])for(const c of M.cats[g]||[])engaged+=Math.max(+mo.b[c]||0,act[c]||0);
+  out.reste=mo.solde+out.rev.a-engaged;out.dep=out.fix.a+out.var.a;
+  return out;
+}
+
+function render(){
+  const app=S.screen==="app"&&S.model;
+  $("#tabs").hidden=!app;
+  $("#mnav").hidden=!(app&&(S.tab==="mois"||S.tab==="ops"));
+  if(!app)return renderGate();
+  document.querySelectorAll("nav.tabs [role=tab]").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===S.tab));
+  $("#prev").disabled=S.m<=1;$("#next").disabled=S.m>=12;
+  ({mois:viewMois,ops:viewOps,annee:viewAnnee,reglages:viewReglages})[S.tab]();
+}
+function renderGate(){
+  const v=$("#view");$("#title").textContent="Budget";
+  if(S.screen==="setup"){
+    v.innerHTML=`<div class="empty"><b>Identifiant Microsoft manquant</b>Collez l'« ID d'application (client) » obtenu dans le portail Azure. Le plus simple est de le mettre une fois pour toutes dans le fichier config.js (voir le guide).<input class="field-in num" id="cid" placeholder="ex. 1a2b3c4d-…" autocomplete="off" autocapitalize="off"><button class="primary" id="cidOk">Enregistrer</button></div>`;
+    $("#cidOk").onclick=()=>{const x=$("#cid").value.trim();if(!/^[0-9a-f-]{36}$/i.test(x)){toast("Cet identifiant n'a pas le bon format (36 caractères).");return}LS.set("clientId",x);location.reload()};
+  }else if(S.screen==="login"){
+    v.innerHTML=`<div class="empty"><b>Connexion à OneDrive</b>L'app lit et enregistre directement dans votre fichier Excel. Connectez-vous avec le compte Microsoft de votre OneDrive.<button class="primary" id="loginBtn">Se connecter avec Microsoft</button></div>`;
+    $("#loginBtn").onclick=()=>login().catch(onError);
+  }else if(S.screen==="pick"){
+    v.innerHTML=`<div class="empty"><b>Choisir votre fichier</b>Recherche des classeurs « BUDGET » sur votre OneDrive…</div>`;
+    listFiles().then(files=>{
+      if(!files.length){v.innerHTML=`<div class="empty"><b>Aucun fichier trouvé</b>Aucun classeur dont le nom contient « BUDGET » n'est sur ce OneDrive. Vérifiez que vous êtes connecté avec le bon compte.<button class="secondary" id="logoutBtn">Changer de compte</button></div>`;$("#logoutBtn").onclick=logout;return}
+      v.innerHTML=`<h2>Votre fichier</h2><div class="list">`+files.map(f=>`<button class="row" data-id="${esc(f.id)}" data-name="${esc(f.name)}"><div class="name">${esc(f.name)}</div><div class="amt"><span>${esc((f.parentReference?.path||"").replace(/^\/drive\/root:?/,"")||"OneDrive")}</span></div></button>`).join("")+`</div><p class="note">Touchez le classeur à utiliser. Vous pourrez en changer dans Réglages.</p>`;
+      v.querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>{S.file={id:b.dataset.id,name:b.dataset.name};LS.set("file",S.file);LS.del("model");S.model=null;S.screen="loading";render();refresh(true)});
+    }).catch(onError);
+  }else{
+    v.innerHTML=`<div class="empty"><b>Ouverture de votre budget…</b>Téléchargement du fichier depuis OneDrive.</div>`;
+  }
+}
+
+function catRow(c,p,a,g){
+  const pct=p>0?Math.min(100,a/p*100):(a>0?100:0);
+  let cls="";if(g==="rev")cls="good";else if(p>0&&a>p)cls="over";else if(p>0&&a/p>.85)cls="near";else if(p===0&&a>0)cls="over";
+  return `<button class="row" data-cat="${esc(c)}"><div class="name">${esc(c)}</div><div class="amt num"><b>${fmt(a)}</b> <span>/ ${fmt(p,false)}</span></div><div class="bar"><i class="${cls}" style="width:${pct}%"></i></div></button>`;
+}
+function viewMois(){
+  const m=S.m,r=monthCalc(m);$("#title").textContent=MOIS[m-1];
+  let h=`<section class="hero"><div class="lbl">Reste à dépenser</div><div class="big">${fmt(r.reste)}</div><div class="hint">Solde de départ + revenus reçus − budget engagé (prévu ou réel, le plus élevé)</div></section>
+  <div class="stats">
+   <div class="stat"><span class="k" style="color:var(--rev)">Revenus</span><span class="v num">${fmt(r.rev.a)}</span><span class="p num">prévu ${fmt(r.rev.p,false)}</span></div>
+   <div class="stat"><span class="k" style="color:var(--dep)">Dépenses</span><span class="v num">${fmt(r.dep)}</span><span class="p num">prévu ${fmt(r.fix.p+r.var.p,false)}</span></div>
+   <div class="stat"><span class="k" style="color:var(--ep)">Épargne</span><span class="v num">${fmt(r.ep.a)}</span><span class="p num">prévu ${fmt(r.ep.p,false)}</span></div>
+   <div class="stat"><span class="k" style="color:var(--cr)">Crédits</span><span class="v num">${fmt(r.cr.a)}</span><span class="p num">prévu ${fmt(r.cr.p,false)}</span></div>
+  </div>
+  <div class="list sec"><div class="sec-h" style="background:var(--sum-h)">Solde de départ</div><button class="row" id="soldeBtn"><div class="name">Report du mois précédent</div><div class="amt num"><b>${fmt(r.mo.solde)}</b></div></button></div>`;
+  for(const [g,label] of [...ORDER,["rev","Revenus"]]){
+    const cats=S.model.cats[g]||[];if(!cats.length)continue;
+    const over=g!=="rev"&&r[g].p>0&&r[g].a>r[g].p;
+    h+=`<div class="list sec"><div class="sec-h" style="background:var(--${g}-h)">${label.toUpperCase()} <small class="num">${fmt(r[g].a,false)} / ${fmt(r[g].p,false)}${over?' <span class="pill">dépassé</span>':""}</small></div>`;
+    for(const c of cats)h+=catRow(c,+r.mo.b[c]||0,r.act[c]||0,g);
+    h+="</div>";
+  }
+  h+=`<p class="note">Touchez une catégorie pour modifier son budget prévu dans l'Excel.</p>`;
+  $("#view").innerHTML=h;
+  $("#soldeBtn").onclick=()=>openBudget(null);
+  $("#view").querySelectorAll("[data-cat]").forEach(b=>b.onclick=()=>openBudget(b.dataset.cat));
+}
+const initials=c=>c.replace(/[^\p{L}\p{N} ]/gu,"").split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"·";
+function viewOps(){
+  const m=S.m;$("#title").textContent=MOIS[m-1];
+  const tx=S.model.months[m-1].tx.slice().sort((a,b)=>b.d.localeCompare(a.d)||b.row-a.row);
+  if(!tx.length){$("#view").innerHTML=`<div class="empty"><b>Aucune opération en ${MOIS[m-1].toLowerCase()}</b>Touchez + pour ajouter une dépense ou un revenu.</div>`;return}
+  const r=monthCalc(m);
+  let h=`<div class="stats" style="margin-top:4px"><div class="stat"><span class="k" style="color:var(--rev)">Entrées</span><span class="v num" style="color:var(--rev)">+${fmt(r.rev.a)}</span></div><div class="stat"><span class="k" style="color:var(--dep)">Sorties</span><span class="v num">−${fmt(r.dep+r.cr.a+r.ep.a)}</span></div></div>`;
+  let day=null;
+  for(const t of tx){
+    const key=t.hasDate?t.d:"";
+    if(key!==day){if(day!==null)h+="</div>";day=key;h+=`<div class="day">${t.hasDate?new Date(t.d+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}):"Sans date"}</div><div class="list">`}
+    const g=groupOf(t.c),plus=g==="rev";
+    h+=`<button class="tx" data-id="${esc(t.id)}"><div class="ico ${g}">${esc(initials(t.c||"?"))}</div><div class="t"><div>${esc(t.c||"Sans catégorie")}</div><small>${esc(t.n||GROUPS.find(x=>x[0]===g)[1])}</small></div><div class="a num ${plus?"plus":""}">${plus?"+":"−"}${fmt(t.a)}</div></button>`;
+  }
+  h+="</div>";
+  $("#view").innerHTML=h;
+  $("#view").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>openTx(S.model.months[m-1].tx.find(t=>t.id===b.dataset.id)));
+}
+function viewAnnee(){
+  $("#title").textContent="Année "+S.model.year;
+  const rows=MOIS.map((_,i)=>monthCalc(i+1));
+  const tot=k=>rows.reduce((s,r)=>s+(k==="dep"?r.dep:r[k].a),0);
+  const totRev=tot("rev"),totDep=tot("dep"),totCr=tot("cr"),totEp=tot("ep");
+  const solde=totRev-totDep-totCr-totEp,taux=totRev>0?totEp/totRev*100:0;
+  const W=340,H=170,L=34,B=22,T=8,max=Math.max(1,...rows.map(r=>Math.max(r.rev.a,r.dep+r.cr.a)));
+  const step=Math.pow(10,Math.floor(Math.log10(max)));const tick=max/step>5?step*2:max/step>2?step:step/2;const top=Math.ceil(max/tick)*tick;
+  const y=v=>T+(H-T-B)*(1-v/top),bw=(W-L)/12;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Revenus et dépenses par mois">`;
+  for(let v=0;v<=top+1e-9;v+=tick)svg+=`<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${y(v)+3.5}" text-anchor="end" font-size="9" fill="var(--muted)" font-family="Calibri,Carlito,sans-serif">${v>=1000?(v/1000).toLocaleString("fr-FR")+"k":v}</text>`;
+  rows.forEach((r,i)=>{const x=L+i*bw+bw*.14,w=bw*.34,d=r.dep+r.cr.a;
+    svg+=`<rect x="${x}" y="${y(r.rev.a)}" width="${w}" height="${Math.max(0,y(0)-y(r.rev.a))}" rx="2" fill="var(--rev)"/>`;
+    svg+=`<rect x="${x+w+1.5}" y="${y(d)}" width="${w}" height="${Math.max(0,y(0)-y(d))}" rx="2" fill="var(--dep)"/>`;
+    svg+=`<text x="${L+i*bw+bw/2}" y="${H-7}" text-anchor="middle" font-size="9" fill="${i+1===S.m?"var(--fg)":"var(--muted)"}">${MOIS[i][0]}</text>`});
+  svg+="</svg>";
+  let h=`<section class="hero"><div class="lbl">Solde de l'année</div><div class="big">${fmt(solde)}</div><div class="hint">Revenus reçus moins dépenses, crédits et épargne versée</div></section>
+  <div class="stats"><div class="stat"><span class="k" style="color:var(--rev)">Revenus</span><span class="v num">${fmt(totRev,false)}</span></div><div class="stat"><span class="k" style="color:var(--dep)">Dépenses</span><span class="v num">${fmt(totDep,false)}</span></div><div class="stat"><span class="k" style="color:var(--ep)">Taux d'épargne</span><span class="v num">${taux.toLocaleString("fr-FR",{maximumFractionDigits:1})} %</span></div><div class="stat"><span class="k" style="color:var(--accent)">Moyenne / mois</span><span class="v num">${fmt(totDep/12,false)}</span><span class="p">dépenses</span></div></div>
+  <h2>Mois par mois</h2><div class="chart">${svg}<div class="legend"><span><i style="background:var(--rev)"></i>Revenus</span><span><i style="background:var(--dep)"></i>Dépenses + crédits</span></div></div>
+  <h2>Par catégorie</h2><div class="list">`;
+  for(const [g,label] of GROUPS)h+=catRow(label,rows.reduce((s,r)=>s+r[g].p,0),rows.reduce((s,r)=>s+r[g].a,0),g).replace("<button","<div").replace(/<\/button>$/,"</div>");
+  h+="</div>";
+  const t2={};for(const r of rows)for(const [c,v] of Object.entries(r.act))if(groupOf(c)!=="rev")t2[c]=(t2[c]||0)+v;
+  const top10=Object.entries(t2).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,10),all=Object.values(t2).reduce((s,v)=>s+v,0)||1;
+  h+=`<h2>Top 10 des dépenses</h2><div class="list">`;
+  if(!top10.length)h+=`<div class="row"><div class="name" style="color:var(--muted)">Aucune dépense saisie</div></div>`;
+  top10.forEach(([c,v],i)=>{h+=`<div class="row"><div class="name"><span class="num" style="color:var(--muted)">${i+1}.</span> ${esc(c)}</div><div class="amt num"><b>${fmt(v)}</b> <span>${(v/all*100).toFixed(0)} %</span></div><div class="bar"><i style="width:${v/top10[0][1]*100}%"></i></div></div>`});
+  h+="</div>";
+  $("#view").innerHTML=h;
+}
+function viewReglages(){
+  $("#title").textContent="Réglages";
+  const t=S.synced?new Date(S.synced).toLocaleString("fr-FR",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"}):"—";
+  $("#view").innerHTML=`<h2>Fichier OneDrive</h2><div class="list"><div class="kv"><span>Classeur</span><b>${esc(S.file?.name||"—")}</b></div><div class="kv"><span>Dernière lecture</span><b>${esc(t)}</b></div><div class="kv"><span>Année</span><b>${S.model.year}</b></div></div>
+  <button class="primary" id="syncBtn">Actualiser depuis OneDrive</button>
+  <button class="secondary" id="pickBtn">Choisir un autre fichier</button>
+  <button class="secondary" id="logoutBtn">Se déconnecter</button>
+  <p class="note">Les catégories et la devise se modifient dans l'onglet PARAMÈTRES de l'Excel. L'app les reprend à la prochaine actualisation.</p>
+  <p class="note">L'app relit le fichier à chaque ouverture. Chaque ajout ou modification est enregistré tout de suite dans l'Excel sur OneDrive.</p>`;
+  $("#syncBtn").onclick=()=>refresh(false);
+  $("#pickBtn").onclick=()=>{S.screen="pick";render()};
+  $("#logoutBtn").onclick=logout;
+}
+function logout(){LS.del("tok");LS.del("model");LS.del("file");S.model=null;S.file=null;S.screen="login";render()}
+
+// ---------- Fenêtres de saisie ----------
+function closeSheet(){$("#layer").innerHTML=""}
+function sheet(html){$("#layer").innerHTML=`<div class="sheet-bg" id="sbg"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div></div>`;$("#sbg").onclick=e=>{if(e.target.id==="sbg")closeSheet()}}
+const parseAmt=v=>{const n=parseFloat(String(v).replace(/[\s €]/g,"").replace(",","."));return isFinite(n)?Math.round(n*100)/100:NaN};
+
+function openTx(t){
+  const edit=!!t;let kind=t?(groupOf(t.c)==="rev"?"in":"out"):"out";let cat=t?.c||"";
+  const Y=S.model.year,isNow=Y===now.getFullYear()&&S.m===now.getMonth()+1;
+  const def=`${Y}-${pad(S.m)}-${pad(isNow?now.getDate():1)}`;
+  sheet(`<h3>${edit?"Modifier":"Nouvelle opération"}<button type="button" id="cx">Annuler</button></h3>
+   <div class="seg"><button type="button" data-k="out">Dépense</button><button type="button" data-k="in">Revenu</button></div>
+   <input class="amount-in num" id="amt" inputmode="decimal" placeholder="0,00 ${esc(cur())}" value="${t?String(t.a).replace(".",","):""}" aria-label="Montant" autocomplete="off">
+   <div id="chips"></div>
+   <div class="field"><label for="dt">Date</label><input type="date" id="dt" min="${Y}-01-01" max="${Y}-12-31" value="${esc(t?t.d:def)}"></div>
+   <div class="field"><label for="nt">Note</label><input id="nt" placeholder="Facultatif" value="${esc(t?.n||"")}"></div>
+   <button class="primary" id="save" disabled>${edit?"Enregistrer":"Ajouter"}</button>
+   ${edit?'<button class="danger" id="del">Supprimer cette opération</button>':""}`);
+  const check=()=>{$("#save").disabled=!(parseAmt($("#amt").value)>0&&cat)};
+  const draw=()=>{
+    const groups=kind==="in"?[["rev","Revenus"]]:ORDER;
+    let h="";for(const [g,l] of groups)h+=`<div class="grp">${l}</div><div class="chips">`+(S.model.cats[g]||[]).map(c=>`<button type="button" class="chip" aria-pressed="${c===cat}" data-c="${esc(c)}">${esc(c)}</button>`).join("")+"</div>";
+    $("#chips").innerHTML=h;
+    $("#chips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{cat=b.dataset.c;draw();check()});
+    document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===kind));
+  };
+  $("#cx").onclick=closeSheet;
+  document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{if(kind!==b.dataset.k){kind=b.dataset.k;cat="";draw();check()}});
+  $("#amt").oninput=check;draw();check();
+  if(!edit)setTimeout(()=>$("#amt")?.focus(),250);
+  $("#save").onclick=async()=>{
+    const d={d:$("#dt").value||def,a:parseAmt($("#amt").value),c:cat,n:$("#nt").value.trim()};
+    $("#save").disabled=true;$("#save").textContent="Enregistrement…";
+    const ok=await mutate(edit?"Modifié dans l'Excel":"Ajouté dans l'Excel",(wb,model)=>edit?opEdit(wb,model,t,d):opAdd(wb,model,d));
+    if(ok){S.m=+d.d.split("-")[1];closeSheet();render()}else if($("#save")){$("#save").disabled=false;$("#save").textContent=edit?"Enregistrer":"Ajouter"}
+  };
+  if(edit){let armed=false;$("#del").onclick=async()=>{
+    if(!armed){armed=true;$("#del").textContent="Toucher à nouveau pour supprimer";return}
+    $("#del").disabled=true;
+    if(await mutate("Supprimé de l'Excel",(wb,model)=>opDelete(wb,model,t))){closeSheet();render()}else if($("#del"))$("#del").disabled=false;
+  }}
+}
+function openBudget(c){
+  const m=S.m,mo=S.model.months[m-1],isSolde=c===null;
+  const val=isSolde?mo.solde:(+mo.b[c]||0);
+  const real=isSolde?0:(monthCalc(m).act[c]||0);
+  sheet(`<h3>${isSolde?"Solde de départ":esc(c)}<button type="button" id="cx">Annuler</button></h3>
+   <p class="note" style="margin-top:-6px">${MOIS[m-1]} ${S.model.year}${isSolde?"":` · réel ${fmt(real)}`}</p>
+   <input class="amount-in num" id="amt" inputmode="decimal" value="${String(val).replace(".",",")}" aria-label="Montant prévu" autocomplete="off">
+   ${isSolde?"":`<p class="note">Les mois suivants qui reprennent le budget de ce mois dans l'Excel suivront automatiquement.</p>`}
+   <button class="primary" id="save">Enregistrer dans l'Excel</button>`);
+  $("#cx").onclick=closeSheet;
+  $("#save").onclick=async()=>{
+    const v=parseAmt($("#amt").value);if(!isFinite(v)){toast("Montant invalide");return}
+    $("#save").disabled=true;
+    if(await mutate("Budget enregistré",(wb,model)=>opBudget(wb,model,m,c,v)))closeSheet();else if($("#save"))$("#save").disabled=false;
+  };
+}
+let tt;function toast(msg,ms=2400){clearTimeout(tt);let el=$(".toast");if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el)}el.textContent=msg;tt=setTimeout(()=>el.remove(),ms)}
+
+// ---------- Démarrage ----------
+document.querySelectorAll("nav.tabs [role=tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;try{sessionStorage.setItem("budget26.tab",S.tab)}catch(e){}scrollTo(0,0);render()});
+$("#prev").onclick=()=>{if(S.m>1){S.m--;render()}};$("#next").onclick=()=>{if(S.m<12){S.m++;render()}};
+$("#addBtn").onclick=()=>{if(S.model)openTx(null)};
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&S.screen==="app"&&!S.busy&&Date.now()-(S.synced||0)>60000)refresh(true)});
+
+(async()=>{
+  if(!window.JSZip){$("#view").innerHTML=`<div class="empty"><b>Chargement impossible</b>Vérifiez votre connexion Internet puis rouvrez l'app.</div>`;return}
+  if(!CLIENT_ID){S.screen="setup";render();return}
+  try{await handleRedirect()}catch(e){S.screen="login";render();toast(e.message,6000);return}
+  if(!LS.get("tok")){S.screen="login";render();return}
+  if(!S.file){S.screen="pick";render();return}
+  if(S.model){S.screen="app";setStatus("ok");render()}else{S.screen="loading";render()}
+  refresh(true);
+})();
+</script>
+</body>
+</html>
