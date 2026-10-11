@@ -75,6 +75,8 @@ h2 small{font-size:14px;color:var(--muted);font-weight:400}
 .bar{grid-column:1/-1;height:6px;border-radius:3px;background:var(--track);overflow:hidden}
 .bar i{display:block;height:100%;border-radius:3px;background:var(--good)}
 .bar i.over{background:var(--bad)}.bar i.near{background:var(--warn)}.bar i.good{background:var(--good)}
+.pill.ok{background:var(--good)}.pill.na{background:transparent;color:var(--muted)}
+.goal-meta{grid-column:1/-1;font-size:13.5px;color:var(--muted)}
 .pill{font-size:12px;padding:2px 8px;border-radius:99px;font-weight:700;background:var(--bad);color:#FFFFFF}
 .tx{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;padding:11px 14px;border-top:1px solid var(--line);width:100%;text-align:left}
 .tx:first-child{border-top:0}
@@ -129,6 +131,7 @@ nav.tabs .add{width:56px;height:56px;border-radius:50%;background:var(--accent);
 <div class="app">
   <header class="top">
     <div style="min-width:0"><div class="sub" id="sub"><i class="dot" id="dot"></i><span id="status">Budget</span></div><h1 id="title">Budget</h1></div>
+    <button class="arrow" id="gearBtn" aria-label="Réglages" hidden><svg viewBox="0 0 24 24" width="20" height="20" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
     <div class="mnav" id="mnav" hidden><button class="arrow" id="prev" aria-label="Mois précédent">‹</button><button class="arrow" id="next" aria-label="Mois suivant">›</button></div>
   </header>
   <main id="view"><div class="empty"><b>Ouverture…</b></div></main>
@@ -138,8 +141,8 @@ nav.tabs .add{width:56px;height:56px;border-radius:50%;background:var(--accent);
   <button role="tab" data-tab="mois" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Mois</button>
   <button role="tab" data-tab="ops" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>Opérations</button>
   <button class="add" id="addBtn" aria-label="Ajouter une opération">+</button>
+  <button role="tab" data-tab="objectifs" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>Objectifs</button>
   <button role="tab" data-tab="annee" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Année</button>
-  <button role="tab" data-tab="reglages" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Réglages</button>
 </nav>
 <div id="layer"></div>
 
@@ -150,6 +153,8 @@ nav.tabs .add{width:56px;height:56px;border-radius:50%;background:var(--accent);
 // ---------- Lecture / écriture du fichier Excel (xlsx = zip de fichiers XML) ----------
 const MONTH_SHEETS=["JANVIER","FÉVRIER","MARS","AVRIL","MAI","JUIN","JUILLET","AOÛT","SEPTEMBRE","OCTOBRE","NOVEMBRE","DÉCEMBRE"];
 const PARAM="PARAMÈTRES";
+const OBJ="OBJECTIF"; // onglet facultatif : objectifs d'épargne
+const GOAL_FIRST=8,GOAL_LAST=17;
 // Où se trouvent les catégories (onglet PARAMÈTRES) et leur budget (onglets des mois)
 const SLOTS={rev:{col:"D",cap:8,mcol:"D",mrow:21},fix:{col:"E",cap:32,mcol:"H",mrow:21},var:{col:"F",cap:32,mcol:"M",mrow:21},ep:{col:"G",cap:8,mcol:"D",mrow:33},cr:{col:"H",cap:8,mcol:"D",mrow:45}};
 const TX_FIRST=57,TX_LAST=306;
@@ -227,6 +232,7 @@ async function openWorkbook(buf){
     if(!sheets[n]||!zip.file(sheets[n]))throw new Error(`Onglet « ${n} » introuvable : ce n'est pas le bon fichier, ou un onglet a été renommé.`);
     wb.xml[n]=await zip.file(sheets[n]).async("string");wb.cells[n]=parseCells(wb.xml[n],ss);
   }
+  if(sheets[OBJ]&&zip.file(sheets[OBJ])){wb.xml[OBJ]=await zip.file(sheets[OBJ]).async("string");wb.cells[OBJ]=parseCells(wb.xml[OBJ],ss)}
   return wb;
 }
 // Valeur d'une cellule ; suit les formules simples du type =SEPTEMBRE!H21 pour rester juste après une modification.
@@ -242,6 +248,8 @@ function buildModel(wb){
   const year=+P.B12?.v||new Date().getFullYear();
   const cats={},slot={};
   for(const [g,s] of Object.entries(SLOTS)){cats[g]=[];for(let i=0;i<s.cap;i++){const v=P[s.col+(5+i)]?.v;if(!blank(v)){const name=String(v).trim();if(slot[name])continue;cats[g].push(name);slot[name]={g,addr:s.mcol+(s.mrow+i)}}}}
+  // Excel compare les catégories sans tenir compte des majuscules : on fait pareil
+  const canon={};for(const n of Object.keys(slot))canon[n.toLowerCase()]=n;
   const months=MONTH_SHEETS.map((sh,i)=>{
     const C=wb.cells[sh],b={};
     for(const [c,sl] of Object.entries(slot))b[c]=+cellVal(wb,sh,sl.addr)||0;
@@ -249,11 +257,23 @@ function buildModel(wb){
     for(let r=TX_FIRST;r<=TX_LAST;r++){
       const a=C["D"+r]?.v,c=C["E"+r]?.v;if(blank(a)&&blank(c))continue;
       const dv=C["B"+r]?.v,hasDate=typeof dv==="number";
-      tx.push({id:sh+"!"+r,sheet:sh,row:r,d:hasDate?serialToISO(dv):`${year}-${pad(i+1)}-01`,hasDate,a:+a||0,c:blank(c)?"":String(c).trim(),n:blank(C["H"+r]?.v)?"":String(C["H"+r].v)});
+      tx.push({id:sh+"!"+r,sheet:sh,row:r,d:hasDate?serialToISO(dv):`${year}-${pad(i+1)}-01`,hasDate,a:+a||0,raw:blank(c)?"":String(c).trim(),c:blank(c)?"":(canon[String(c).trim().toLowerCase()]||String(c).trim()),n:blank(C["H"+r]?.v)?"":String(C["H"+r].v)});
     }
     return {sheet:sh,solde:+cellVal(wb,sh,"D7")||0,b,tx};
   });
-  return {currency,year,cats,slot,months};
+  let goals=null,soldeMin=null;
+  const G=wb.cells[OBJ];
+  if(G){
+    goals=[];
+    for(let r=GOAL_FIRST;r<=GOAL_LAST;r++){
+      const name=cellVal(wb,OBJ,"A"+r),cat=cellVal(wb,OBJ,"B"+r);
+      if(blank(name)&&blank(cat))continue;
+      const dv=cellVal(wb,OBJ,"D"+r),catName=blank(cat)?"":(canon[String(cat).trim().toLowerCase()]||String(cat).trim());
+      goals.push({row:r,name:blank(name)?catName:String(name).trim(),cat:catName,target:+cellVal(wb,OBJ,"C"+r)||0,date:typeof dv==="number"?serialToISO(dv):null,deja:+cellVal(wb,OBJ,"E"+r)||0});
+    }
+    const sm=cellVal(wb,OBJ,"B22");soldeMin=typeof sm==="number"?sm:null;
+  }
+  return {currency,year,cats,slot,months,goals,soldeMin};
 }
 function markDirty(wb,sheet,xml){wb.xml[sheet]=xml;wb.cells[sheet]=parseCells(xml,wb.ss);wb.dirty.add(sheet)}
 function writeRow(wb,sheet,row,t){
@@ -268,10 +288,20 @@ function freeRow(wb,sheet){const C=wb.cells[sheet];for(let r=TX_FIRST;r<=TX_LAST
 function sheetForDate(model,iso){const [y,m]=iso.split("-").map(Number);if(y!==model.year)throw new Error(`Ce fichier couvre l'année ${model.year} : choisissez une date de ${model.year}.`);return MONTH_SHEETS[m-1]}
 function opAdd(wb,model,t){const sh=sheetForDate(model,t.d);const r=freeRow(wb,sh);if(!r)throw new Error(`L'onglet ${sh} est plein (250 opérations).`);writeRow(wb,sh,r,t)}
 function checkSame(wb,old){const C=wb.cells[old.sheet];const a=+C["D"+old.row]?.v||0,c=blank(C["E"+old.row]?.v)?"":String(C["E"+old.row].v).trim();
-  if(Math.abs(a-old.a)>0.004||c!==old.c)throw Object.assign(new Error("Cette opération a été modifiée dans l'Excel entre-temps. Les données sont rechargées : réessayez."),{stale:true})}
+  if(Math.abs(a-old.a)>0.004||c!==(old.raw??old.c))throw Object.assign(new Error("Cette opération a été modifiée dans l'Excel entre-temps. Les données sont rechargées : réessayez."),{stale:true})}
 function opEdit(wb,model,old,t){checkSame(wb,old);const sh=sheetForDate(model,t.d);if(sh===old.sheet)writeRow(wb,sh,old.row,t);else{writeRow(wb,old.sheet,old.row,null);opAdd(wb,model,t)}}
 function opDelete(wb,model,old){checkSame(wb,old);writeRow(wb,old.sheet,old.row,null)}
 function opBudget(wb,model,m,cat,value){const sh=MONTH_SHEETS[m-1];const addr=cat===null?"D7":model.slot[cat]?.addr;if(!addr)throw new Error("Catégorie introuvable dans PARAMÈTRES.");markDirty(wb,sh,setCell(wb.xml[sh],addr,value))}
+function needObj(wb){if(!wb.xml[OBJ])throw new Error("Ce fichier n'a pas d'onglet OBJECTIF.")}
+function opGoal(wb,model,row,g){
+  needObj(wb);let r=row;
+  if(!r){const C=wb.cells[OBJ];for(let i=GOAL_FIRST;i<=GOAL_LAST;i++){if(blank(cellVal(wb,OBJ,"A"+i))&&blank(cellVal(wb,OBJ,"B"+i))){r=i;break}}if(!r)throw new Error("L'onglet OBJECTIF est plein (10 objectifs).")}
+  let x=wb.xml[OBJ];
+  x=setCell(x,"A"+r,g?g.name:null);x=setCell(x,"B"+r,g?g.cat:null);
+  x=setCell(x,"C"+r,g&&g.target?g.target:null);x=setCell(x,"D"+r,g&&g.date?isoToSerial(g.date):null);x=setCell(x,"E"+r,g&&g.deja?g.deja:null);
+  markDirty(wb,OBJ,x);
+}
+function opSoldeMin(wb,model,v){needObj(wb);markDirty(wb,OBJ,setCell(wb.xml[OBJ],"B22",v))}
 async function packWorkbook(wb){
   const z=wb.zip;
   for(const n of wb.dirty)z.file(wb.sheets[n],wb.xml[n]);
@@ -392,7 +422,7 @@ async function gjson(path){const r=await graph(path);if(!r.ok)return null;return
 // Cherche le classeur par plusieurs moyens : emplacement habituel, recherche, fichiers récents.
 async function listFiles(){
   const found=new Map();const add=f=>{if(f&&f.file&&/\.xlsx$/i.test(f.name)&&!found.has(f.id))found.set(f.id,f)};
-  const direct=await gjson(`/me/drive/root:/${encodeURIComponent("BUDGET - APP")}/${encodeURIComponent("BUDGET_2026.xlsx")}?${SEL}`);add(direct);
+  for(const fname of ["Budget.xlsx","BUDGET_2026.xlsx"])add(await gjson(`/me/drive/root:/${encodeURIComponent("BUDGET - APP")}/${encodeURIComponent(fname)}?${SEL}`));
   for(const q of ["BUDGET_2026","BUDGET","2026"]){const j=await gjson(`/me/drive/root/search(q='${encodeURIComponent(q)}')?${SEL}&$top=100`);(j?.value||[]).forEach(add)}
   const rec=await gjson(`/me/drive/recent?$top=50`);(rec?.value||[]).map(x=>x.remoteItem?{...x.remoteItem,id:x.remoteItem.id,name:x.name||x.remoteItem.name,file:x.file||x.remoteItem.file}:x).forEach(add);
   return [...found.values()].sort((a,b)=>(/budget/i.test(b.name)-/budget/i.test(a.name))||String(b.lastModifiedDateTime).localeCompare(String(a.lastModifiedDateTime)));
@@ -442,7 +472,7 @@ function monthCalc(m){
   const out={act,mo};
   for(const [g] of GROUPS)out[g]={p:sum(g,mo.b),a:sum(g,act)};
   let engaged=0;for(const g of ["fix","var","cr","ep"])for(const c of M.cats[g]||[])engaged+=Math.max(+mo.b[c]||0,act[c]||0);
-  out.reste=mo.solde+out.rev.a-engaged;out.dep=out.fix.a+out.var.a;
+  out.reste=mo.solde+out.rev.a-engaged;out.compte=mo.solde+out.rev.a-out.fix.a-out.var.a-out.cr.a-out.ep.a;out.dep=out.fix.a+out.var.a;
   return out;
 }
 
@@ -450,10 +480,11 @@ function render(){
   const app=S.screen==="app"&&S.model;
   $("#tabs").hidden=!app;
   $("#mnav").hidden=!(app&&(S.tab==="mois"||S.tab==="ops"));
+  $("#gearBtn").hidden=!(app&&!(S.tab==="mois"||S.tab==="ops"));
   if(!app)return renderGate();
   document.querySelectorAll("nav.tabs [role=tab]").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===S.tab));
   $("#prev").disabled=S.m<=1;$("#next").disabled=S.m>=12;
-  ({mois:viewMois,ops:viewOps,annee:viewAnnee,reglages:viewReglages})[S.tab]();
+  ({mois:viewMois,ops:viewOps,objectifs:viewObjectifs,annee:viewAnnee,reglages:viewReglages}[S.tab]||viewMois)();
 }
 function renderGate(){
   const v=$("#view");$("#title").textContent="Budget";
@@ -504,7 +535,7 @@ function catRow(c,p,a,g){
 }
 function viewMois(){
   const m=S.m,r=monthCalc(m);$("#title").textContent=MOIS[m-1];
-  let h=`<section class="hero"><div class="lbl">Reste à dépenser</div><div class="big">${fmt(r.reste)}</div><div class="hint">Solde de départ + revenus reçus − budget engagé (prévu ou réel, le plus élevé)</div></section>
+  let h=`<section class="hero"><div class="lbl">Reste à dépenser</div><div class="big">${fmt(r.reste)}</div><div class="hint">Solde de départ + revenus reçus − budget engagé (prévu ou réel, le plus élevé)</div><div class="hint" style="opacity:1;font-size:15px;margin-top:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,.35)">Reste sur le compte : <b class="num">${fmt(r.compte)}</b></div></section>
   <div class="stats">
    <div class="stat"><span class="k" style="color:var(--rev)">Revenus</span><span class="v num">${fmt(r.rev.a)}</span><span class="p num">prévu ${fmt(r.rev.p,false)}</span></div>
    <div class="stat"><span class="k" style="color:var(--dep)">Dépenses</span><span class="v num">${fmt(r.dep)}</span><span class="p num">prévu ${fmt(r.fix.p+r.var.p,false)}</span></div>
@@ -571,6 +602,75 @@ function viewAnnee(){
   top10.forEach(([c,v],i)=>{h+=`<div class="row"><div class="name"><span class="num" style="color:var(--muted)">${i+1}.</span> ${esc(c)}</div><div class="amt num"><b>${fmt(v)}</b> <span>${(v/all*100).toFixed(0)} %</span></div><div class="bar"><i style="width:${v/top10[0][1]*100}%"></i></div></div>`});
   h+="</div>";
   $("#view").innerHTML=h;
+}
+function goalStats(g){
+  const M=S.model;let year=0;for(const mo of M.months)for(const t of mo.tx)if(g.cat&&t.c===g.cat)year+=t.a;
+  const total=g.deja+year,reste=g.target?Math.max(0,g.target-total):0,prog=g.target?Math.min(1,total/g.target):0;
+  let months=0;if(g.date){const [y,m]=g.date.split("-").map(Number);months=Math.max(0,(y-now.getFullYear())*12+m-(now.getMonth()+1)+1)}
+  const per=(reste===0||!g.date)?0:(months===0?reste:reste/months);
+  return {year,total,reste,prog,months,per};
+}
+function viewObjectifs(){
+  $("#title").textContent="Objectifs";
+  const M=S.model;
+  if(!M.goals){$("#view").innerHTML=`<div class="empty"><b>Pas d'onglet OBJECTIF</b>Votre fichier Excel n'a pas d'onglet « OBJECTIF ». Ajoutez-le dans l'Excel pour suivre vos objectifs d'épargne ici.</div>`;return}
+  const st=M.goals.map(g=>({g,...goalStats(g)}));
+  const tot=st.reduce((a,x)=>({target:a.target+x.g.target,total:a.total+x.total,reste:a.reste+x.reste,per:a.per+x.per}),{target:0,total:0,reste:0,per:0});
+  let h=`<section class="hero"><div class="lbl">Déjà épargné</div><div class="big">${fmt(tot.total)}</div><div class="hint">${tot.target?`sur un objectif total de ${fmt(tot.target,false)} · ${Math.round(tot.total/tot.target*100)} %`:"Fixez un montant cible à vos objectifs pour suivre votre progression"}</div></section>
+  <div class="stats"><div class="stat"><span class="k" style="color:var(--ep)">Reste à épargner</span><span class="v num">${fmt(tot.reste,false)}</span></div><div class="stat"><span class="k" style="color:var(--accent)">À épargner / mois</span><span class="v num">${fmt(tot.per,false)}</span></div></div>`;
+  st.forEach((x,i)=>{
+    const g=x.g,dt=g.date?new Date(g.date+"T12:00:00").toLocaleDateString("fr-FR",{month:"long",year:"numeric"}):null;
+    h+=`<div class="list sec"><div class="sec-h" style="background:var(--ep-h)">${esc(g.name)} <small>${esc(g.cat||"sans catégorie")}</small></div>
+      <button class="row" data-goal="${i}"><div class="name num">${fmt(x.total)}</div><div class="amt num"><span>${g.target?"sur "+fmt(g.target,false):"pas de montant cible"}</span></div>
+      <div class="bar"><i class="${x.prog>=1?"good":""}" style="width:${x.prog*100}%;background:${x.prog>=1?"var(--good)":"var(--ep)"}"></i></div>
+      <div class="goal-meta">${g.target?(x.reste>0?`Reste ${fmt(x.reste,false)}`:"Objectif atteint"):""}${dt?` · avant ${dt} · ${x.months} mois`:""}${x.per>0?` · <b style="color:var(--fg)">${fmt(x.per,false)} / mois</b>`:""}${g.deja?` · dont ${fmt(g.deja,false)} déjà de côté au 1er janvier`:""}</div></button></div>`;
+  });
+  if(M.goals.length<GOAL_LAST-GOAL_FIRST+1)h+=`<button class="secondary" id="addGoal">+ Ajouter un objectif</button>`;
+  // solde minimum
+  const min=M.soldeMin;
+  h+=`<div class="list sec" style="margin-top:26px"><div class="sec-h" style="background:var(--fix-h)">OBJECTIF DE SOLDE SUR LE COMPTE</div>
+    <button class="row" id="minBtn"><div class="name">Solde minimum souhaité</div><div class="amt num"><b>${min===null?"non défini":fmt(min,false)}</b></div></button>`;
+  MOIS.forEach((nm,i)=>{const r=monthCalc(i+1);const act=r.rev.a+r.fix.a+r.var.a+r.cr.a+r.ep.a!==0;
+    const ok=r.compte>=(min||0);
+    h+=`<div class="row"><div class="name">${nm}</div><div class="amt num"><b>${act?fmt(r.compte):""}</b> ${act?`<span class="pill ${ok?"ok":""}">${ok?"Atteint":"En dessous"}</span>`:`<span class="pill na">—</span>`}</div></div>`});
+  h+=`</div><p class="note">« Déjà épargné » additionne ce que vous aviez de côté au 1er janvier et les versements réels de la catégorie d'épargne liée, dans les 12 mois. Touchez un objectif pour le modifier.</p>`;
+  $("#view").innerHTML=h;
+  $("#view").querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal(M.goals[+b.dataset.goal]));
+  if($("#addGoal"))$("#addGoal").onclick=()=>openGoal(null);
+  $("#minBtn").onclick=openSoldeMin;
+}
+function openGoal(g){
+  const edit=!!g;let cat=g?g.cat:(S.model.cats.ep[0]||"");
+  sheet(`<h3>${edit?"Modifier l'objectif":"Nouvel objectif"}<button type="button" id="cx">Annuler</button></h3>
+   <div class="field"><label for="gName">Objectif</label><input id="gName" placeholder="ex. Voyage au Japon" value="${esc(g?.name||"")}"></div>
+   <div class="grp">Catégorie d'épargne liée</div><div class="chips" id="gCats"></div>
+   <div class="field"><label for="gTarget">Montant cible</label><input id="gTarget" inputmode="decimal" placeholder="0" value="${g&&g.target?String(g.target).replace(".",","):""}"></div>
+   <div class="field"><label for="gDate">Date cible</label><input type="date" id="gDate" value="${esc(g?.date||"")}"></div>
+   <div class="field"><label for="gDeja">Déjà de côté au 1er janv.</label><input id="gDeja" inputmode="decimal" placeholder="0" value="${g&&g.deja?String(g.deja).replace(".",","):""}"></div>
+   <button class="primary" id="gSave">${edit?"Enregistrer dans l'Excel":"Ajouter l'objectif"}</button>
+   ${edit?'<button class="danger" id="gDel">Supprimer cet objectif</button>':""}`);
+  const drawCats=()=>{$("#gCats").innerHTML=(S.model.cats.ep||[]).map(c=>`<button type="button" class="chip" aria-pressed="${c===cat}" data-c="${esc(c)}">${esc(c)}</button>`).join("");$("#gCats").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{cat=b.dataset.c;drawCats()})};
+  drawCats();$("#cx").onclick=closeSheet;
+  $("#gSave").onclick=async()=>{
+    const name=$("#gName").value.trim(),target=$("#gTarget").value.trim()?parseAmt($("#gTarget").value):0,deja=$("#gDeja").value.trim()?parseAmt($("#gDeja").value):0;
+    if(!name){toast("Donnez un nom à l'objectif.");return}
+    if(!isFinite(target)||!isFinite(deja)){toast("Montant invalide");return}
+    const ng={name,cat,target,date:$("#gDate").value||null,deja};
+    $("#gSave").disabled=true;
+    if(await mutate(edit?"Objectif enregistré":"Objectif ajouté",(wb,model)=>opGoal(wb,model,edit?g.row:null,ng))){closeSheet();render()}else if($("#gSave"))$("#gSave").disabled=false;
+  };
+  if(edit){let armed=false;$("#gDel").onclick=async()=>{if(!armed){armed=true;$("#gDel").textContent="Toucher à nouveau pour supprimer";return}
+    if(await mutate("Objectif supprimé",(wb,model)=>opGoal(wb,model,g.row,null))){closeSheet();render()}}}
+}
+function openSoldeMin(){
+  const v=S.model.soldeMin;
+  sheet(`<h3>Solde minimum<button type="button" id="cx">Annuler</button></h3>
+   <p class="note" style="margin-top:-6px">Montant que vous voulez garder au minimum sur le compte chaque mois.</p>
+   <input class="amount-in num" id="minAmt" inputmode="decimal" value="${v===null?"":String(v).replace(".",",")}" placeholder="0" aria-label="Solde minimum">
+   <button class="primary" id="minSave">Enregistrer dans l'Excel</button>`);
+  $("#cx").onclick=closeSheet;
+  $("#minSave").onclick=async()=>{const x=$("#minAmt").value.trim()?parseAmt($("#minAmt").value):null;if(x!==null&&!isFinite(x)){toast("Montant invalide");return}
+    $("#minSave").disabled=true;if(await mutate("Solde minimum enregistré",(wb,model)=>opSoldeMin(wb,model,x))){closeSheet();render()}else if($("#minSave"))$("#minSave").disabled=false};
 }
 function viewReglages(){
   $("#title").textContent="Réglages";
@@ -650,6 +750,7 @@ let tt;function toast(msg,ms=2400){clearTimeout(tt);let el=$(".toast");if(!el){e
 document.querySelectorAll("nav.tabs [role=tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;try{sessionStorage.setItem("budget26.tab",S.tab)}catch(e){}scrollTo(0,0);render()});
 $("#prev").onclick=()=>{if(S.m>1){S.m--;render()}};$("#next").onclick=()=>{if(S.m<12){S.m++;render()}};
 $("#addBtn").onclick=()=>{if(S.model)openTx(null)};
+$("#gearBtn").onclick=()=>{S.tab="reglages";scrollTo(0,0);render()};
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&S.screen==="app"&&!S.busy&&Date.now()-(S.synced||0)>60000)refresh(true)});
 
 (async()=>{
