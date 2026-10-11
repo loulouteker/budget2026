@@ -156,7 +156,21 @@ const PARAM="PARAMÈTRES";
 const OBJ="OBJECTIF"; // onglet facultatif : objectifs d'épargne
 const GOAL_FIRST=8,GOAL_LAST=17;
 // Où se trouvent les catégories (onglet PARAMÈTRES) et leur budget (onglets des mois)
-const SLOTS={rev:{col:"D",cap:8,mcol:"D",mrow:21},fix:{col:"E",cap:32,mcol:"H",mrow:21},var:{col:"F",cap:32,mcol:"M",mrow:21},ep:{col:"G",cap:8,mcol:"D",mrow:33},cr:{col:"H",cap:8,mcol:"D",mrow:45}};
+// Catégories : colonne dans PARAMÈTRES, nombre de lignes, première ligne du tableau dans les onglets des mois.
+// La colonne « Prévu » de chaque tableau est retrouvée d'après les titres (voir layoutOf), pour suivre les colonnes ajoutées dans l'Excel.
+const SLOTS={rev:{col:"D",cap:8,mrow:21},fix:{col:"E",cap:32,mrow:21},var:{col:"F",cap:32,mrow:21},ep:{col:"G",cap:8,mrow:33},cr:{col:"H",cap:8,mrow:45}};
+const colLetter=n=>{let s="";while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s};
+function layoutOf(wb,sh){
+  wb.layout=wb.layout||{};if(wb.layout[sh])return wb.layout[sh];
+  const C=wb.cells[sh];const txt=a=>{const v=C[a]?.v;return v===null||v===undefined?"":String(v).trim().toUpperCase()};
+  const find=(row,re)=>{for(let c=1;c<=40;c++)if(re.test(txt(colLetter(c)+row)))return c;return null};
+  const prevu=(titleRow,re)=>{const c=find(titleRow,re);if(!c)return null;for(let k=c;k<=c+6;k++)if(/^PR[ÉE]VU$/.test(txt(colLetter(k)+(titleRow+1))))return colLetter(k);return null};
+  const L={rev:prevu(19,/^REVENUS/),fix:prevu(19,/FIXES/),var:prevu(19,/VARIABLES/),ep:prevu(31,/PARGNE/),cr:prevu(43,/CR[ÉE]DITS/)};
+  const tx={};for(let c=1;c<=20;c++){const t=txt(colLetter(c)+56),l=colLetter(c);if(t==="DATE")tx.date=tx.date||l;else if(t==="MONTANT")tx.amt=tx.amt||l;else if(/^CAT[ÉE]GORIE/.test(t))tx.cat=tx.cat||l;else if(t==="NOTES")tx.note=tx.note||l}
+  const miss=[...Object.entries(L).filter(([,v])=>!v).map(([k])=>k),...["date","amt","cat","note"].filter(k=>!tx[k])];
+  if(miss.length)throw new Error(`Onglet ${sh} : je ne retrouve pas tous les tableaux (titres « Prévu », « Date », « Montant »… modifiés ?).`);
+  L.tx=tx;return wb.layout[sh]=L;
+}
 const TX_FIRST=57,TX_LAST=306;
 const XLSX_MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -247,17 +261,17 @@ function buildModel(wb){
   const currency=blank(P.B5?.v)?"€":String(P.B5.v).trim();
   const year=+P.B12?.v||new Date().getFullYear();
   const cats={},slot={};
-  for(const [g,s] of Object.entries(SLOTS)){cats[g]=[];for(let i=0;i<s.cap;i++){const v=P[s.col+(5+i)]?.v;if(!blank(v)){const name=String(v).trim();if(slot[name])continue;cats[g].push(name);slot[name]={g,addr:s.mcol+(s.mrow+i)}}}}
+  for(const [g,s] of Object.entries(SLOTS)){cats[g]=[];for(let i=0;i<s.cap;i++){const v=P[s.col+(5+i)]?.v;if(!blank(v)){const name=String(v).trim();if(slot[name])continue;cats[g].push(name);slot[name]={g,row:s.mrow+i}}}}
   // Excel compare les catégories sans tenir compte des majuscules : on fait pareil
   const canon={};for(const n of Object.keys(slot))canon[n.toLowerCase()]=n;
   const months=MONTH_SHEETS.map((sh,i)=>{
-    const C=wb.cells[sh],b={};
-    for(const [c,sl] of Object.entries(slot))b[c]=+cellVal(wb,sh,sl.addr)||0;
+    const C=wb.cells[sh],b={},L=layoutOf(wb,sh),T=L.tx;
+    for(const [c,sl] of Object.entries(slot))b[c]=+cellVal(wb,sh,L[sl.g]+sl.row)||0;
     const tx=[];
     for(let r=TX_FIRST;r<=TX_LAST;r++){
-      const a=C["D"+r]?.v,c=C["E"+r]?.v;if(blank(a)&&blank(c))continue;
-      const dv=C["B"+r]?.v,hasDate=typeof dv==="number";
-      tx.push({id:sh+"!"+r,sheet:sh,row:r,d:hasDate?serialToISO(dv):`${year}-${pad(i+1)}-01`,hasDate,a:+a||0,raw:blank(c)?"":String(c).trim(),c:blank(c)?"":(canon[String(c).trim().toLowerCase()]||String(c).trim()),n:blank(C["H"+r]?.v)?"":String(C["H"+r].v)});
+      const a=C[T.amt+r]?.v,c=C[T.cat+r]?.v;if(blank(a)&&blank(c))continue;
+      const dv=C[T.date+r]?.v,hasDate=typeof dv==="number";
+      tx.push({id:sh+"!"+r,sheet:sh,row:r,d:hasDate?serialToISO(dv):`${year}-${pad(i+1)}-01`,hasDate,a:+a||0,raw:blank(c)?"":String(c).trim(),c:blank(c)?"":(canon[String(c).trim().toLowerCase()]||String(c).trim()),n:blank(C[T.note+r]?.v)?"":String(C[T.note+r].v)});
     }
     return {sheet:sh,solde:+cellVal(wb,sh,"D7")||0,b,tx};
   });
@@ -275,23 +289,23 @@ function buildModel(wb){
   }
   return {currency,year,cats,slot,months,goals,soldeMin};
 }
-function markDirty(wb,sheet,xml){wb.xml[sheet]=xml;wb.cells[sheet]=parseCells(xml,wb.ss);wb.dirty.add(sheet)}
+function markDirty(wb,sheet,xml){wb.xml[sheet]=xml;wb.cells[sheet]=parseCells(xml,wb.ss);wb.dirty.add(sheet);if(wb.layout)delete wb.layout[sheet]}
 function writeRow(wb,sheet,row,t){
-  let x=wb.xml[sheet];
-  x=setCell(x,"B"+row,t?isoToSerial(t.d):null);
-  x=setCell(x,"D"+row,t?t.a:null);
-  x=setCell(x,"E"+row,t?t.c:null);
-  x=setCell(x,"H"+row,t&&t.n?t.n:null);
+  let x=wb.xml[sheet];const T=layoutOf(wb,sheet).tx;
+  x=setCell(x,T.date+row,t?isoToSerial(t.d):null);
+  x=setCell(x,T.amt+row,t?t.a:null);
+  x=setCell(x,T.cat+row,t?t.c:null);
+  x=setCell(x,T.note+row,t&&t.n?t.n:null);
   markDirty(wb,sheet,x);
 }
-function freeRow(wb,sheet){const C=wb.cells[sheet];for(let r=TX_FIRST;r<=TX_LAST;r++){if(blank(C["D"+r]?.v)&&blank(C["E"+r]?.v))return r}return null}
+function freeRow(wb,sheet){const C=wb.cells[sheet],T=layoutOf(wb,sheet).tx;for(let r=TX_FIRST;r<=TX_LAST;r++){if(blank(C[T.amt+r]?.v)&&blank(C[T.cat+r]?.v))return r}return null}
 function sheetForDate(model,iso){const [y,m]=iso.split("-").map(Number);if(y!==model.year)throw new Error(`Ce fichier couvre l'année ${model.year} : choisissez une date de ${model.year}.`);return MONTH_SHEETS[m-1]}
 function opAdd(wb,model,t){const sh=sheetForDate(model,t.d);const r=freeRow(wb,sh);if(!r)throw new Error(`L'onglet ${sh} est plein (250 opérations).`);writeRow(wb,sh,r,t)}
-function checkSame(wb,old){const C=wb.cells[old.sheet];const a=+C["D"+old.row]?.v||0,c=blank(C["E"+old.row]?.v)?"":String(C["E"+old.row].v).trim();
+function checkSame(wb,old){const C=wb.cells[old.sheet],T=layoutOf(wb,old.sheet).tx;const a=+C[T.amt+old.row]?.v||0,c=blank(C[T.cat+old.row]?.v)?"":String(C[T.cat+old.row].v).trim();
   if(Math.abs(a-old.a)>0.004||c!==(old.raw??old.c))throw Object.assign(new Error("Cette opération a été modifiée dans l'Excel entre-temps. Les données sont rechargées : réessayez."),{stale:true})}
 function opEdit(wb,model,old,t){checkSame(wb,old);const sh=sheetForDate(model,t.d);if(sh===old.sheet)writeRow(wb,sh,old.row,t);else{writeRow(wb,old.sheet,old.row,null);opAdd(wb,model,t)}}
 function opDelete(wb,model,old){checkSame(wb,old);writeRow(wb,old.sheet,old.row,null)}
-function opBudget(wb,model,m,cat,value){const sh=MONTH_SHEETS[m-1];const addr=cat===null?"D7":model.slot[cat]?.addr;if(!addr)throw new Error("Catégorie introuvable dans PARAMÈTRES.");markDirty(wb,sh,setCell(wb.xml[sh],addr,value))}
+function opBudget(wb,model,m,cat,value){const sh=MONTH_SHEETS[m-1];const sl=model.slot[cat];const addr=cat===null?"D7":(sl?layoutOf(wb,sh)[sl.g]+sl.row:null);if(!addr)throw new Error("Catégorie introuvable dans PARAMÈTRES.");markDirty(wb,sh,setCell(wb.xml[sh],addr,value))}
 function needObj(wb){if(!wb.xml[OBJ])throw new Error("Ce fichier n'a pas d'onglet OBJECTIF.")}
 function opGoal(wb,model,row,g){
   needObj(wb);let r=row;
